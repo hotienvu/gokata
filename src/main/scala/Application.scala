@@ -1,8 +1,4 @@
 
 object Application {
-
-  def main(args : Array[String]): Unit ={
-    println("Hello Scalaporeans!")
-  }
-
+  val board = Board(5, 5)
 }
