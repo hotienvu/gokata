@@ -8,26 +8,36 @@ case object Empty extends Cell
 object Board {
 
   type Position = (Int, Int)
+  val EmptyPosition = Array.empty[Position]
+
+  def apply(cells: Array[Array[Cell]]): Board = {
+    new Board(cells) with SelfCheck with NewBoardCheck with BoardTraversable
+  }
 
   def apply(numRows: Int, numCols: Int): Board = {
     val cells = Array.ofDim[Cell](numRows, numCols)
     for (xs <- cells; i <- 0 until numCols)
       xs(i) = Empty
-    new Board(cells) with SelfCheck with NewBoardCheck with BoardTraversable
+    Board(cells)
   }
 
   def apply(_cells: Array[Array[Cell]], i: Int, j: Int, c: Cell): Board = {
     val cells = _cells.clone()
     cells(i)(j) = c
-    new Board(cells) with SelfCheck with NewBoardCheck with BoardTraversable
+    Board(cells)
   }
 
-  def apply(_cells: Array[Array[Cell]], captured: Array[Position]): Board = ???
+  def apply(_cells: Array[Array[Cell]], captured: Array[Position]): Board = {
+    val cells = _cells.clone()
+    captured.foreach{ case (i, j) => cells(i)(j) = Empty }
+    Board(cells)
+  }
 }
 
 
 trait SelfCheck {
   this: Board with BoardTraversable =>
+  import Board.{Position, EmptyPosition}
 
   def nonEmptyCheck(i: Int, j: Int, c: Cell): Try[Board] = cells(i)(j) match {
     case Empty => Success(this)
@@ -35,11 +45,24 @@ trait SelfCheck {
   }
 
 
-  def captureOpponentCheck(i: Int, j: Int, c: Cell): Try[Board] = ???
+  def captureOpponentCheck(i: Int, j: Int, c: Cell): Try[Board] = {
+    val newBoard = Board(cells, i, j , c)
+    val captured = neighbors((i, j)) map { case (ii, jj) =>
+      if (newBoard.cells(ii)(jj) != newBoard.cells(i)(j)) traverse(newBoard, ii, jj)
+      else Success(EmptyPosition)
+    }
+
+    val allCaptured = captured.foldLeft(Set.empty[Position])((accum, positions) => positions match {
+      case Success(xs) => accum ++ xs.toSet
+      case _ => accum
+    })
+
+    Success(Board(newBoard.cells, allCaptured.toArray))
+  }
 }
 
 trait BoardTraversable {
-  import Board.Position
+  import Board.{Position, EmptyPosition}
 
   def neighbors(p: Position): Array[Position] = {
     val upDowLeftRight = Array((-1, 0), (1, 0), (0, -1), (0, 1))
@@ -71,7 +94,7 @@ trait BoardTraversable {
     }
 
     try {
-      if (isFree(si, sj, Set((si, sj)))) Success(Array.empty)
+      if (isFree(si, sj, Set((si, sj)))) Success(EmptyPosition)
       else Success(visit(si, sj, Set((si, sj))).toArray)
     } catch {
       case e: Exception => Failure(new Exception("Recursion exception"))
@@ -81,12 +104,13 @@ trait BoardTraversable {
 
 trait NewBoardCheck {
   this: BoardTraversable =>
+  import Board.EmptyPosition
 
   def noSelfCaptureCheck(board: Board, i: Int, j: Int, c: Cell): Try[Board] = {
       val newBoard = Board(board.cells, i, j, c)
       traverse(newBoard, i, j) match {
         case Failure(x: Throwable) => Failure(x)
-        case Success(Array.empty) => Success(newBoard)
+        case Success(EmptyPosition) => Success(newBoard)
         case _ => Failure(new Exception("Is self-captured"))
       }
   }
