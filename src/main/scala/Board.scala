@@ -1,14 +1,22 @@
 import scala.util.{Failure, Success, Try}
 
-abstract class Cell
+
+abstract class Cell extends Serializable with Product
 case object Black extends Cell
 case object White extends Cell
 case object Empty extends Cell
+
+object Move {
+  def apply(i: Int, j: Int, c: String): Move = Move(i, j, if (c == "w") White else Black)
+}
+case class Move(i: Int, j: Int, c: Cell)
+
 
 object Board {
 
   type Position = (Int, Int)
   val EmptyPosition = Array.empty[Position]
+
 
   def apply(cells: Array[Array[Cell]]): Board = {
     new Board(cells) with SelfCheck with NewBoardCheck with BoardTraversable
@@ -20,6 +28,17 @@ object Board {
       xs(i) = Empty
     Board(cells)
   }
+
+  def apply(_cells: Array[String]): Board = {
+    val cells = _cells.map(_.toCharArray map (c => c match {
+      case 'w' => White
+      case 'b' => Black
+      case _ => Empty
+    }))
+
+    Board(cells)
+  }
+
 
   def apply(_cells: Array[Array[Cell]], i: Int, j: Int, c: Cell): Board = {
     val cells = _cells.clone()
@@ -122,13 +141,12 @@ trait NewBoardCheck {
 class Board(val cells: Array[Array[Cell]]) {
   this: SelfCheck with NewBoardCheck =>
 
-  def move(i: Int, j: Int, c: Cell, prev: Board): Try[Board] = {
+  def move(i: Int, j: Int, c: Cell): Try[Board] = {
     for (
       nonEmpty <- nonEmptyCheck(i, j, c);
       captureOpponent <- captureOpponentCheck(i, j, c);
-      noSelfCapture <- noSelfCaptureCheck(captureOpponent,i, j, c);
-      noLoop <- noLoopCheck(prev, noSelfCapture)
-    ) yield noLoop
+      noSelfCapture <- noSelfCaptureCheck(captureOpponent,i, j, c)
+    ) yield noSelfCapture
   }
 }
 
