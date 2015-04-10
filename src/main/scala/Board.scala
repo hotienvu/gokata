@@ -2,9 +2,15 @@ import scala.util.{Failure, Success, Try}
 
 
 abstract class Cell extends Serializable with Product
-case object Black extends Cell
-case object White extends Cell
-case object Empty extends Cell
+case object Black extends Cell {
+  override def toString = "b"
+}
+case object White extends Cell {
+  override def toString = "w"
+}
+case object Empty extends Cell {
+  override def toString = "."
+}
 
 object Move {
   def apply(i: Int, j: Int, c: String): Move = Move(i, j, if (c == "w") White else Black)
@@ -55,19 +61,18 @@ object Board {
 
 
 trait SelfCheck {
-  this: Board with BoardTraversable =>
+  this: BoardTraversable =>
   import Board.{Position, EmptyPosition}
 
-  def nonEmptyCheck(i: Int, j: Int, c: Cell): Try[Board] = cells(i)(j) match {
-    case Empty => Success(this)
+  def nonEmptyCheck(board: Board, i: Int, j: Int, c: Cell): Try[Board] = board.cells(i)(j) match {
+    case Empty => Success(board)
     case _ => Failure(new Exception("Cell already occupied"))
   }
 
-
-  def captureOpponentCheck(i: Int, j: Int, c: Cell): Try[Board] = {
-    val newBoard = Board(cells, i, j , c)
+  def captureOpponentCheck(board: Board, i: Int, j: Int, c: Cell): Try[Board] = {
+    val newBoard = Board(board.cells, i, j , c)
     val captured = neighbors((i, j)) map { case (ii, jj) =>
-      if (newBoard.cells(ii)(jj) != newBoard.cells(i)(j)) traverse(newBoard, ii, jj)
+      if (isInside(newBoard, ii, jj) && newBoard.cells(ii)(jj) != newBoard.cells(i)(j)) getCapturedCells(newBoard, ii, jj)
       else Success(EmptyPosition)
     }
 
@@ -84,32 +89,36 @@ trait BoardTraversable {
   import Board.{Position, EmptyPosition}
 
   def neighbors(p: Position): Array[Position] = {
-    val upDowLeftRight = Array((-1, 0), (1, 0), (0, -1), (0, 1))
-    upDowLeftRight map {case (di, dj) => (di+p._1, dj+p._2) }
+    val upDownLeftRight = Array((-1, 0), (1, 0), (0, -1), (0, 1))
+    upDownLeftRight map {case (di, dj) => (di+p._1, dj+p._2) }
   }
+
+  def isInside(board: Board, i: Int, j: Int) = i >= 0 && j >= 0 && i < board.cells.length && j < board.cells(0).length
   /*
     given a board, get all captured cells starting from (si,sj) with color c
     return None if the cells starting from (si,sj) are free
    */
-  def traverse(board: Board, si: Int, sj: Int): Try[Array[Position]] = {
+  def getCapturedCells(board: Board, si: Int, sj: Int): Try[Array[Position]] = {
     val color = board.cells(si)(sj)
+
+
+    def isOk(i: Int, j: Int) = isInside(board, i, j) && (board.cells(i)(j) == color || board.cells(i)(j) == Empty)
 
     def isFree(i: Int, j: Int, visited: Set[Position]): Boolean = {
       if (board.cells(i)(j) == Empty) true
       else {
-        neighbors((i, j)) exists { case (ii, jj) => !visited.contains((ii, jj)) && board.cells(ii)(jj) == color && isFree(ii, jj, visited + ((ii, jj)))}
+        neighbors((i, j)) exists { case (ii, jj) =>
+          isOk(ii, jj) && !visited.contains((ii, jj)) && isFree(ii, jj, visited + ((ii, jj)))
+        }
       }
     }
 
     def visit(i: Int, j: Int, visited: Set[Position]): Set[Position] = {
-      if (visited.contains((i, j))) visited
-      else {
-        val upDowLeftRight = Array((-1, 0), (1, 0), (0, -1), (0, 1))
-        val neighbors = upDowLeftRight map {case (di, dj) => (di+i, dj+j) }
-        neighbors map {
-          case (ii, jj) => if (!visited.contains((ii, jj)) && board.cells(ii)(jj) == color) visit(ii, jj, visited + ((ii, jj))) else Set.empty[Position]
-        } reduce(_ ++ _)
-      }
+      (neighbors((i, j)) map {
+        case (ii, jj) =>
+          if (isInside(board, ii, jj) && !visited.contains((ii, jj)) && board.cells(ii)(jj) == color) visit(ii, jj, visited + ((ii, jj)))
+          else Set.empty[Position]
+      } reduce(_ ++ _)) + ((i, j))
     }
 
     try {
@@ -126,12 +135,12 @@ trait NewBoardCheck {
   import Board.EmptyPosition
 
   def noSelfCaptureCheck(board: Board, i: Int, j: Int, c: Cell): Try[Board] = {
-      val newBoard = Board(board.cells, i, j, c)
-      traverse(newBoard, i, j) match {
-        case Failure(x: Throwable) => Failure(x)
-        case Success(EmptyPosition) => Success(newBoard)
-        case _ => Failure(new Exception("Is self-captured"))
-      }
+    val newBoard = Board(board.cells, i, j, c)
+    getCapturedCells(newBoard, i, j) match {
+      case Failure(x: Throwable) => Failure(x)
+      case Success(EmptyPosition) => Success(newBoard)
+      case _ => Failure(new Exception("Is self-captured"))
+    }
   }
 
 
@@ -143,10 +152,14 @@ class Board(val cells: Array[Array[Cell]]) {
 
   def move(i: Int, j: Int, c: Cell): Try[Board] = {
     for (
-      nonEmpty <- nonEmptyCheck(i, j, c);
-      captureOpponent <- captureOpponentCheck(i, j, c);
+      nonEmpty <- nonEmptyCheck(this, i, j, c);
+      captureOpponent <- captureOpponentCheck(nonEmpty, i, j, c);
       noSelfCapture <- noSelfCaptureCheck(captureOpponent,i, j, c)
     ) yield noSelfCapture
+  }
+
+  override def toString = {
+    cells map (row => row.mkString("")) mkString "\n"
   }
 }
 

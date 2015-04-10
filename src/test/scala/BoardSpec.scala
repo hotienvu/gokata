@@ -1,13 +1,66 @@
-import org.scalatest.{BeforeAndAfter, Matchers, FlatSpec}
+import org.scalatest.FlatSpec
+import org.scalatest.TryValues._
 
-class BoardSpec extends FlatSpec with Matchers {
+class BoardSpec extends FlatSpec {
 
 }
 
-class SelfCheckSpec extends FlatSpec with Matchers with BeforeAndAfter {
-  val board =
+class SelfCheckSpec extends FlatSpec {
+  val board = Board(Array(
+    "ww.",
+    "bb."
+  ))
 
-  "1.NonEmptyCheck" should "only allow putting in non-empty cell" in {
+  val check = new SelfCheck with BoardTraversable{}
+
+  "nonEmptyCheck" should "only allow putting in non-empty cell" in {
+    assert(check.nonEmptyCheck(board, 0, 0, Black).failure.exception.getMessage === "Cell already occupied")
+    assert(check.nonEmptyCheck(board, 1, 0, White).failure.exception.getMessage === "Cell already occupied")
+    assert(check.nonEmptyCheck(board, 1, 2, Black).success.value === board)
+  }
+
+  "captureOpponentCheck" should "remove opponents chess if their liberty is zero" in {
+    val afterCaptured = Board(Array(
+      "..b",
+      "bb."
+    ))
+    assert(check.captureOpponentCheck(board, 0, 2, Black).success.value.cells === afterCaptured.cells)
+  }
+}
+
+class NewBoardCheckSpec extends FlatSpec {
+  val board = Board(Array(
+    ".w.",
+    "w.w",
+    ".w."
+  ))
+
+  val check = new NewBoardCheck with BoardTraversable {}
+
+  "noSelfCaptureCheck" should "not allow new cell to be immediately captured" in {
+    assert(check.noSelfCaptureCheck(board, 1, 1, Black).getOrElse("failure") === "failure")
+  }
+}
+
+class BoardTraversalSpec extends FlatSpec {
+  val board = Board(Array(
+    "wbww.",
+    "wwbbb",
+    "bb..."
+  ))
+
+  val traversable = new BoardTraversable {}
+
+  "getCapturedCells" should "return all captured cells starting from(i,j)" in {
+    val captured = Set((0, 0), (1, 0), (1, 1))
+    assert(traversable.getCapturedCells(board, 1, 1).map(_.toSet).success.value === captured)
+  }
+
+  it should "return empty if no cell are captured" in {
+    assert(traversable.getCapturedCells(board, 0, 2).success.value  === Board.EmptyPosition)
+  }
+
+  it should "return Failure if something went wrong" in {
 
   }
 }
