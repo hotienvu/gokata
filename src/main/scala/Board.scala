@@ -47,13 +47,13 @@ object Board {
 
 
   def apply(_cells: Array[Array[Cell]], i: Int, j: Int, c: Cell): Board = {
-    val cells = _cells.clone()
+    val cells = _cells.map(_.clone())
     cells(i)(j) = c
     Board(cells)
   }
 
   def apply(_cells: Array[Array[Cell]], captured: Array[Position]): Board = {
-    val cells = _cells.clone()
+    val cells = _cells.map(_.clone())
     captured.foreach{ case (i, j) => cells(i)(j) = Empty }
     Board(cells)
   }
@@ -64,7 +64,7 @@ trait SelfCheck {
   this: BoardTraversable =>
   import Board.{Position, EmptyPosition}
 
-  def nonEmptyCheck(board: Board, i: Int, j: Int, c: Cell): Try[Board] = board.cells(i)(j) match {
+  def nonEmptyCheck(board: Board, i: Int, j: Int): Try[Board] = board.cells(i)(j) match {
     case Empty => Success(board)
     case _ => Failure(new Exception("Cell already occupied"))
   }
@@ -143,7 +143,6 @@ trait NewBoardCheck {
     }
   }
 
-
   def noLoopCheck(prev: Board, cur: Board): Try[Board] = ???
 }
 
@@ -151,11 +150,12 @@ class Board(val cells: Array[Array[Cell]]) {
   this: SelfCheck with NewBoardCheck =>
 
   def move(i: Int, j: Int, c: Cell): Try[Board] = {
-    for (
-      nonEmpty <- nonEmptyCheck(this, i, j, c);
+    val newBoard = for (
+      nonEmpty <- nonEmptyCheck(this, i, j);
       captureOpponent <- captureOpponentCheck(nonEmpty, i, j, c);
       noSelfCapture <- noSelfCaptureCheck(captureOpponent,i, j, c)
     ) yield noSelfCapture
+    newBoard
   }
 
   override def toString = {

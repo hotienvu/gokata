@@ -1,9 +1,7 @@
 import org.scalatest.FlatSpec
 import org.scalatest.TryValues._
 
-class BoardSpec extends FlatSpec {
 
-}
 
 class SelfCheckSpec extends FlatSpec {
   val board = Board(Array(
@@ -14,9 +12,9 @@ class SelfCheckSpec extends FlatSpec {
   val check = new SelfCheck with BoardTraversable{}
 
   "nonEmptyCheck" should "only allow putting in non-empty cell" in {
-    assert(check.nonEmptyCheck(board, 0, 0, Black).failure.exception.getMessage === "Cell already occupied")
-    assert(check.nonEmptyCheck(board, 1, 0, White).failure.exception.getMessage === "Cell already occupied")
-    assert(check.nonEmptyCheck(board, 1, 2, Black).success.value === board)
+    assert(check.nonEmptyCheck(board, 0, 0).failure.exception.getMessage === "Cell already occupied")
+    assert(check.nonEmptyCheck(board, 1, 0).failure.exception.getMessage === "Cell already occupied")
+    assert(check.nonEmptyCheck(board, 1, 2).success.value === board)
   }
 
   "captureOpponentCheck" should "remove opponents chess if their liberty is zero" in {
@@ -30,15 +28,14 @@ class SelfCheckSpec extends FlatSpec {
 
 class NewBoardCheckSpec extends FlatSpec {
   val board = Board(Array(
-    ".w.",
-    "w.w",
-    ".w."
+    ".b",
+    "b."
   ))
 
   val check = new NewBoardCheck with BoardTraversable {}
 
   "noSelfCaptureCheck" should "not allow new cell to be immediately captured" in {
-    assert(check.noSelfCaptureCheck(board, 1, 1, Black).getOrElse("failure") === "failure")
+    assert(check.noSelfCaptureCheck(board, 0, 0, White).failure.exception.getMessage === "Is self-captured")
   }
 }
 
@@ -62,5 +59,18 @@ class BoardTraversalSpec extends FlatSpec {
 
   it should "return Failure if something went wrong" in {
 
+  }
+}
+
+class BoardSpec extends FlatSpec {
+  val board = Board(Array(
+    ".b...",
+    "bw...",
+    ".....",
+    ".....",
+    "....."
+  ))
+  "move" should "return a new board after apply all checks" in {
+    assert(board.move(0, 0, White).failure.exception.getMessage === "Is self-captured")
   }
 }
