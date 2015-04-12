@@ -29,7 +29,8 @@ class SelfCheckSpec extends FlatSpec {
 class NewBoardCheckSpec extends FlatSpec {
   val board = Board(Array(
     ".b",
-    "b."
+    "b.",
+    ".."
   ))
 
   val check = new NewBoardCheck with BoardTraversable {}
@@ -66,11 +67,22 @@ class BoardSpec extends FlatSpec {
   val board = Board(Array(
     ".b...",
     "bw...",
-    ".....",
-    ".....",
-    "....."
+    "..wb.",
+    ".w.wb",
+    "..wb."
+  ))
+  val before = Board(Array(
+    ".b...",
+    "bw...",
+    "..wb.",
+    ".wb.b",
+    "..wb."
   ))
   "move" should "return a new board after apply all checks" in {
-    assert(board.move(0, 0, White).failure.exception.getMessage === "Is self-captured")
+    assert(board.move(Board(5, 5), 0, 0, White).failure.exception.getMessage === "Is self-captured")
+  }
+
+  it should "not allow move that result in the same state as the previous move" in {
+    assert(board.move(before, 3, 2, Black).failure.exception.getMessage === "Infinite loop")
   }
 }

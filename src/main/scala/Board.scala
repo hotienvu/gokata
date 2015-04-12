@@ -143,19 +143,24 @@ trait NewBoardCheck {
     }
   }
 
-  def noLoopCheck(prev: Board, cur: Board): Try[Board] = ???
+  def noLoopCheck(prev: Board, current: Board): Try[Board] = {
+    val different = prev.cells.zipWithIndex.exists{ case (row, i) =>
+      row.zipWithIndex.exists{ case (cell, j) => cell != current.cells(i)(j) }
+    }
+    if (different) Success(current) else Failure(new Exception("Infinite loop"))
+  }
 }
 
 class Board(val cells: Array[Array[Cell]]) {
   this: SelfCheck with NewBoardCheck =>
 
-  def move(i: Int, j: Int, c: Cell): Try[Board] = {
-    val newBoard = for (
+  def move(prev: Board, i: Int, j: Int, c: Cell): Try[Board] = {
+    for (
       nonEmpty <- nonEmptyCheck(this, i, j);
       captureOpponent <- captureOpponentCheck(nonEmpty, i, j, c);
-      noSelfCapture <- noSelfCaptureCheck(captureOpponent,i, j, c)
-    ) yield noSelfCapture
-    newBoard
+      noSelfCapture <- noSelfCaptureCheck(captureOpponent,i, j, c);
+      newBoard <- noLoopCheck(prev, noSelfCapture)
+    ) yield newBoard
   }
 
   override def toString = {
