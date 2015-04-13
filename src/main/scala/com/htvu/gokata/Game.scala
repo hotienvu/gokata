@@ -1,3 +1,5 @@
+package com.htvu.gokata
+
 trait GamePlay {
   def play(prev: Board, current: Board, moves: Stream[Move]): Stream[Board] = {
     println(current)

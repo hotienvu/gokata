@@ -1,15 +1,22 @@
+package com.htvu.gokata
 import scala.util.{Failure, Success, Try}
 
 
-abstract class Cell extends Serializable with Product
+abstract class Cell extends Serializable with Product {
+  def isEmpty: Boolean
+}
+
 case object Black extends Cell {
   override def toString = "b"
+  override def isEmpty: Boolean = false
 }
 case object White extends Cell {
   override def toString = "w"
+  override def isEmpty: Boolean = false
 }
 case object Empty extends Cell {
   override def toString = "."
+  override def isEmpty: Boolean = true
 }
 
 object Move {
@@ -22,7 +29,6 @@ object Board {
 
   type Position = (Int, Int)
   val EmptyPosition = Array.empty[Position]
-
 
   def apply(cells: Array[Array[Cell]]): Board = {
     new Board(cells) with SelfCheck with NewBoardCheck with BoardTraversable
@@ -102,10 +108,10 @@ trait BoardTraversable {
     val color = board.cells(si)(sj)
 
 
-    def isOk(i: Int, j: Int) = isInside(board, i, j) && (board.cells(i)(j) == color || board.cells(i)(j) == Empty)
+    def isOk(i: Int, j: Int) = isInside(board, i, j) && (board.cells(i)(j) == color || board.cells(i)(j).isEmpty)
 
     def isFree(i: Int, j: Int, visited: Set[Position]): Boolean = {
-      if (board.cells(i)(j) == Empty) true
+      if (board.cells(i)(j).isEmpty) true
       else {
         neighbors((i, j)) exists { case (ii, jj) =>
           isOk(ii, jj) && !visited.contains((ii, jj)) && isFree(ii, jj, visited + ((ii, jj)))
@@ -144,15 +150,25 @@ trait NewBoardCheck {
   }
 
   def noLoopCheck(prev: Board, current: Board): Try[Board] = {
-    val different = prev.cells.zipWithIndex.exists{ case (row, i) =>
-      row.zipWithIndex.exists{ case (cell, j) => cell != current.cells(i)(j) }
-    }
+    val different = prev =/= current
     if (different) Success(current) else Failure(new Exception("Infinite loop"))
   }
 }
 
-class Board(val cells: Array[Array[Cell]]) {
+trait BoardTrait {
+  this: Board =>
+  def ===(that: Board) = ! =/=(that)
+
+  def =/=(that: Board) = cells.zipWithIndex.exists{ case (row, i) =>
+    row.zipWithIndex.exists{ case (cell, j) => cell != that.cells(i)(j) }
+  }
+}
+
+class Board(val cells: Array[Array[Cell]]) extends BoardTrait {
   this: SelfCheck with NewBoardCheck =>
+
+  val nrows = cells.length
+  val ncols = cells(0).length
 
   def move(prev: Board, i: Int, j: Int, c: Cell): Try[Board] = {
     for (

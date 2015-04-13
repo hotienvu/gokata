@@ -1,7 +1,7 @@
+package com.htvu.gokata
+
 import org.scalatest.FlatSpec
 import org.scalatest.TryValues._
-
-
 
 class SelfCheckSpec extends FlatSpec {
   val board = Board(Array(
@@ -64,25 +64,29 @@ class BoardTraversalSpec extends FlatSpec {
 }
 
 class BoardSpec extends FlatSpec {
-  val board = Board(Array(
-    ".b...",
-    "bw...",
-    "..wb.",
-    ".w.wb",
-    "..wb."
-  ))
-  val before = Board(Array(
-    ".b...",
-    "bw...",
-    "..wb.",
-    ".wb.b",
-    "..wb."
-  ))
-  "move" should "return a new board after apply all checks" in {
-    assert(board.move(Board(5, 5), 0, 0, White).failure.exception.getMessage === "Is self-captured")
+  "move" should "calculate liberty after removing captured opponent if any" in {
+    val board = Board(Array(
+      ".b",
+      "bw"
+    ))
+    val expected = Board(Array(
+      "w.",
+      ".w"
+    ))
+    assert(board.move(Board(5, 5), 0, 0, White).success.value.cells === expected.cells)
   }
 
   it should "not allow move that result in the same state as the previous move" in {
-    assert(board.move(before, 3, 2, Black).failure.exception.getMessage === "Infinite loop")
+    val board = Board(Array(
+      ".wb.",
+      "w.wb",
+      ".wb."
+    ))
+    val before = Board(Array(
+    ".wb.",
+    "wb.b",
+    ".wb."
+  ))
+    assert(board.move(before, 1, 1, Black).failure.exception.getMessage === "Infinite loop")
   }
 }

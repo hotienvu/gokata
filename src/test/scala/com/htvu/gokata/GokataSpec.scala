@@ -1,6 +1,6 @@
+package com.htvu.gokata
+
 import org.scalatest._
-
-
 
 class GokataSpec extends FlatSpec with Matchers{
 
