@@ -26,7 +26,6 @@ case class Move(i: Int, j: Int, c: Cell)
 
 
 object Board {
-
   type Position = (Int, Int)
   val EmptyPosition = Array.empty[Position]
 
@@ -34,12 +33,7 @@ object Board {
     new Board(cells) with SelfCheck with NewBoardCheck with BoardTraversable
   }
 
-  def apply(numRows: Int, numCols: Int): Board = {
-    val cells = Array.ofDim[Cell](numRows, numCols)
-    for (xs <- cells; i <- 0 until numCols)
-      xs(i) = Empty
-    Board(cells)
-  }
+  def apply(nrows: Int, ncols: Int): Board = Board(Array.fill[Cell](nrows, ncols) { Empty })
 
   def apply(_cells: Array[String]): Board = {
     val cells = _cells.map(_.toCharArray map (c => c match {
@@ -47,10 +41,8 @@ object Board {
       case 'b' => Black
       case _ => Empty
     }))
-
     Board(cells)
   }
-
 
   def apply(_cells: Array[Array[Cell]], i: Int, j: Int, c: Cell): Board = {
     val cells = _cells.map(_.clone())
@@ -64,7 +56,6 @@ object Board {
     Board(cells)
   }
 }
-
 
 trait SelfCheck {
   this: BoardTraversable =>
@@ -106,7 +97,6 @@ trait BoardTraversable {
    */
   def getCapturedCells(board: Board, si: Int, sj: Int): Try[Array[Position]] = {
     val color = board.cells(si)(sj)
-
 
     def isOk(i: Int, j: Int) = isInside(board, i, j) && (board.cells(i)(j) == color || board.cells(i)(j).isEmpty)
 
