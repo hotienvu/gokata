@@ -3,6 +3,8 @@ package com.htvu.gokata.pbt
 import com.htvu.gokata._
 import org.scalacheck.{Prop, Gen}
 import org.scalacheck.commands.Commands
+import org.scalatest.PropSpec
+import org.scalatest.prop.Checkers
 
 import scala.util.{Failure, Try, Success}
 
@@ -10,95 +12,79 @@ import scala.util.{Failure, Try, Success}
 case class Game(var board: Board) {
   var prev = Board(board.nrows, board.ncols)
 
-  def move(i: Int, j: Int, c: Cell): Board = {
+  def move(i: Int, j: Int, c: Cell): Try[Board] = {
     val current = board
     board.move(prev, i, j, c) match {
       case Success(newBoard) => {
         prev = current
         board = newBoard
-        board
+        Success(newBoard)
       }
-      case _ => { /* do nothing */ }
+      case e: Failure[Board] => e
     }
-    board
   }
 }
 
-object GameSpec extends Commands {
+object GameSpecfication extends Commands {
   override type State = Board
 
   override type Sut = Game
 
-  trait MoveCommand extends Command {
-    type Result = Board
-
-    var move: Move = null
-
-    def genMove(sut: Sut): Gen[Move]
+  abstract class MoveCommand(i: Int, j: Int, c: Cell) extends Command {
+    type Result = Try[Board]
 
     def run(sut: Sut): Result = {
-      genMove(sut).sample match {
-        case Some(Move(i, j, c)) => {
-          move = Move(i, j, c)
-          sut.move(i, j, c)
-          sut.board
-        }
-        case _ => {
-          throw new Exception("failed")
-        }
-      }
+        sut.move(i, j, c)
     }
   }
 
-  case object NonEmptyMove extends MoveCommand {
+  case class NonEmptyMove(i: Int, j: Int, c: Cell) extends MoveCommand(i: Int, j: Int, c: Cell) {
     def preCondition(state: State): Boolean = state.cells.exists(_.exists(!_.isEmpty))
-
-    def genMove(sut: Sut): Gen[Move] = {
-      val board = sut.board
-      val nonEmptyCells = board.cells.flatten.zipWithIndex.filter(!_._1.isEmpty).map { case (c, i) => (i / board.ncols, i % board.ncols)}
-      for (
-        (i, j) <- Gen.oneOf(nonEmptyCells);
-        c <- Gen.oneOf(Black, White)
-      ) yield Move(i, j, c)
-    }
 
     def nextState(state: State): State = state
 
     def postCondition(state: State, result: Try[Result]): Prop = result match {
-      case Success(newBoard) => state === newBoard
+      case Success(res) => res match {
+        case Failure(_) => true
+        case _ => false
+      }
       case _ => false
     }
   }
 
-  case object NormalMove extends MoveCommand {
-    override def preCondition(state: State): Boolean = state.cells.exists(_.exists(_.isEmpty))
+  case class NormalMove(i: Int, j: Int, c: Cell) extends MoveCommand(i: Int, j: Int, c: Cell) {
+    def preCondition(state: State): Boolean = state.cells.exists(_.exists(_.isEmpty))
 
-    override def postCondition(state: State, result: Try[Result]): Prop = result match {
-      case Success(newBoard) => state.cells.count(_.isEmpty) + 1 == state.cells.count(_.isEmpty)
+    def postCondition(state: State, result: Try[Result]): Prop = result match {
+      case Success(result) => result match {
+        case Success(newBoard) => state.cells.flatten.count(_.isEmpty) == newBoard.cells.flatten.count(_.isEmpty) + 1
+        case _ => false
+      }
       case _ => false
     }
 
-    def genMove(sut: Sut): Gen[Move] = {
-      val board = sut.board
-      val emptyCells = board.cells.flatten.zipWithIndex.filter(_._1.isEmpty).map { case (c, i) => (i / board.ncols, i % board.ncols)}
-      for (
-        (i, j) <- Gen.oneOf(emptyCells);
-        c <- Gen.oneOf(Black, White)
-      ) yield Move(i, j, c)
-    }
-
-    override def nextState(state: State): State = Board(state.cells, move.i, move.j, move.c)
+    def nextState(state: State): State = Board(state.cells, i, j, c)
   }
 
-  def genInitialState: Gen[GameSpec.State] = Gen.choose(3, 10) map (n => Board(n, n))
+  def genInitialState: Gen[GameSpecfication.State] = Gen.const(2) map (n => Board(n, n))
 
-  def newSut(state: GameSpec.State): Sut = new Game(state)
+  def newSut(state: GameSpecfication.State): Sut = new Game(state)
 
-  def genCommand(state: GameSpec.State): Gen[GameSpec.Command] = Gen.oneOf(NormalMove, NonEmptyMove)
+  def genCommand(state: GameSpecfication.State): Gen[GameSpecfication.Command] = for (
+    i <- Gen.choose(0, state.nrows-1);
+    j <- Gen.choose(0, state.ncols-1);
+    c <- Gen.oneOf(Black, White)
+  ) yield if (state.cells(i)(j).isEmpty) NormalMove(i, j, c) else NonEmptyMove(i, j, c)
 
   def canCreateNewSut(newState: State, initSuts: Traversable[State], runningSuts: Traversable[Sut]): Boolean = true
 
   def destroySut(sut: Sut): Unit = {}
 
   def initialPreCondition(state: State): Boolean = true
+}
+
+class GameSpec extends PropSpec with Checkers {
+  property("Game Specification") {
+    check(GameSpecfication.property())
+  }
 }

@@ -8,15 +8,15 @@ abstract class Cell extends Serializable with Product {
 
 case object Black extends Cell {
   override def toString = "b"
-  override def isEmpty: Boolean = false
+  def isEmpty: Boolean = false
 }
 case object White extends Cell {
   override def toString = "w"
-  override def isEmpty: Boolean = false
+  def isEmpty: Boolean = false
 }
 case object Empty extends Cell {
   override def toString = "."
-  override def isEmpty: Boolean = true
+  def isEmpty: Boolean = true
 }
 
 object Move {
